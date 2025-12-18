@@ -23,6 +23,7 @@ TARGET = hidman
 
 COMMON = \
 $(OBJDIR)/keyboardled.rel \
+$(OBJDIR)/serial_input.rel \
 $(OBJDIR)/parsedescriptor.rel \
 $(OBJDIR)/system.rel \
 $(OBJDIR)/usbhost.rel \
