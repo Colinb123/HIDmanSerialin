@@ -59,6 +59,7 @@ void InitSettings(bool SafeMode) {
     if (HMSettings.Magic != 0x54178008){
         // failed, do something bad
         DEBUGOUT("Initing settings failed\n");
-    }
+    }// Force PS/2 Mode (0) regardless of saved settings
+    HMSettings.KeyboardMode = 0;
 }
 

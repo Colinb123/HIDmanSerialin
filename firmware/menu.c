@@ -478,12 +478,13 @@ void inputProcess(void)
             }
             else
             {
-                // cycle through modes on unpress of button
-                HMSettings.KeyboardMode++;
-                if (HMSettings.KeyboardMode > 2)
-                    HMSettings.KeyboardMode = 0;
-                SyncSettings();
-                ports[PORT_KEY].state = S_INIT;
+             //   // cycle through modes on unpress of button 
+             // we only need ps2 but left the code here in case
+            //   HMSettings.KeyboardMode++;
+             //   if (HMSettings.KeyboardMode > 2)
+             //       HMSettings.KeyboardMode = 0;
+             //   SyncSettings();
+             //   ports[PORT_KEY].state = S_INIT;
             }
 
             // start the counter
