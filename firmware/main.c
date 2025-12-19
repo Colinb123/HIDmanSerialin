@@ -30,7 +30,7 @@ void EveryMillisecond(void) {
 	else if (UsbUpdateCounter == 8){ s_CheckUsbPort1 = TRUE; UsbUpdateCounter = 0; }
 	UsbUpdateCounter++;
 
-    // inputProcess is now empty in menu.c, but we keep the call
+	// Check input (now disabled in menu.c)
 	inputProcess();
 
 	if (KeyBatCounter){ KeyBatCounter--; if (!KeyBatCounter) SimonSaysSendKeyboard(KEY_BATCOMPLETE); }
@@ -40,23 +40,41 @@ void EveryMillisecond(void) {
 	if (LEDDelayMs) {
 		LEDDelayMs--;
 	} else {
-#if defined(BOARD_MICRO)
-		SetPWM2Dat(0x10);
-#elif defined (BOARD_PS2)
-		P0 |= 0b01110000;
-		switch (FlashSettings->KeyboardMode) {
-			case MODE_PS2: P0 &= ~0b01000000; break;     // Blue
-			case MODE_XT:  P0 &= ~0b00010000; P0 &= ~0b00100000; break; // Orange
-			case MODE_AMSTRAD: P0 &= ~0b00010000; P0 &= ~0b00100000; P0 &= ~0b01000000; break; // White
-		}
-#else
-			SetPWM1Dat(0x00); SetPWM2Dat(0x00); T3_FIFO_L = 0; T3_FIFO_H = 0;
-			switch (FlashSettings->KeyboardMode){
-				case MODE_PS2: T3_FIFO_L = 0xFF; T3_FIFO_H = 0; break;
-				case MODE_XT: SetPWM2Dat(0x10); SetPWM1Dat(0x40); break;
-				case MODE_AMSTRAD: SetPWM1Dat(0x30); SetPWM2Dat(0x20); T3_FIFO_L = 0x3F; T3_FIFO_H = 0; break;
-			}
-#endif
+        // --- HEARTBEAT LOGIC ---
+        // Blink Orange every 500ms to show code is running
+        static uint16_t Heartbeat = 0;
+        Heartbeat++;
+        
+        if (Heartbeat > 500) {
+            // Force Orange LED (XT Color)
+            #if defined(BOARD_PS2)
+                P0 |= 0b01110000; // Turn off RGB
+                P0 &= ~0b00010000; P0 &= ~0b00100000; // Turn on Orange bits
+            #endif
+            
+            // Reset counter after 50ms blink
+            if (Heartbeat > 550) Heartbeat = 0;
+            
+        } else {
+            // Normal Operation (Solid Color based on Mode)
+            #if defined(BOARD_MICRO)
+                SetPWM2Dat(0x10);
+            #elif defined (BOARD_PS2)
+                P0 |= 0b01110000;
+                switch (FlashSettings->KeyboardMode) {
+                    case MODE_PS2: P0 &= ~0b01000000; break;     // Blue
+                    case MODE_XT:  P0 &= ~0b00010000; P0 &= ~0b00100000; break; // Orange
+                    case MODE_AMSTRAD: P0 &= ~0b00010000; P0 &= ~0b00100000; P0 &= ~0b01000000; break; // White
+                }
+            #else
+                SetPWM1Dat(0x00); SetPWM2Dat(0x00); T3_FIFO_L = 0; T3_FIFO_H = 0;
+                switch (FlashSettings->KeyboardMode){
+                    case MODE_PS2: T3_FIFO_L = 0xFF; T3_FIFO_H = 0; break;
+                    case MODE_XT: SetPWM2Dat(0x10); SetPWM1Dat(0x40); break;
+                    case MODE_AMSTRAD: SetPWM1Dat(0x30); SetPWM2Dat(0x20); T3_FIFO_L = 0x3F; T3_FIFO_H = 0; break;
+                }
+            #endif
+        }
 	}
 }
 
