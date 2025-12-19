@@ -45,21 +45,24 @@ void InitSettings(bool SafeMode) {
         memset(&HMSettings, 0x00, sizeof(Settings));
         HMSettings.Magic = 0x54178008;
 
-        //if (!SafeMode) HMSettings.Intellimouse = 1;
         HMSettings.Intellimouse = 1;
-        //HMSettings.EnableAUXPS2 = 1;
-        //HMSettings.SerialDebugOutput = 1;
-        //HMSettings.MouseReportMode = 1;
         if (SyncSettings()) {
             DEBUGOUT("Writin failed\n");
         }
     }
+    
+    // Load settings from Flash to RAM
     memcpy(&HMSettings, FlashSettings, sizeof(Settings));
 
     if (HMSettings.Magic != 0x54178008){
-        // failed, do something bad
         DEBUGOUT("Initing settings failed\n");
-    }// Force PS/2 Mode (0) regardless of saved settings
-    HMSettings.KeyboardMode = 0;
-}
+    }
 
+    // --- FORCE PS/2 MODE LOCK ---
+    // If the Flash Memory says we are not in PS/2 mode (0), 
+    // we must update RAM and WRITE IT BACK TO FLASH.
+    if (HMSettings.KeyboardMode != 0) {
+        HMSettings.KeyboardMode = 0; // Set to PS/2
+        SyncSettings();              // Save to Flash (Essential for Interrupts!)
+    }
+}
