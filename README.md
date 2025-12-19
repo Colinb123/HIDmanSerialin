@@ -1,5 +1,5 @@
-# HIDman
-## USB HID to XT / AT / PS/2 / Serial converter
+# HIDman fork
+## USB HID to and Serial HID to PS/2
 
 HIDman is an open source device to allow the use of modern USB keyboards and mice on legacy PCs. Its an amazing project and Kudos to all the forks before me. This has been modified for my personal needs but I thought I'd share incase it was useful.
 
