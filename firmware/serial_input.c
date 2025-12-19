@@ -1,70 +1,95 @@
 #include <stdio.h>
 #include <string.h>
-#include "type.h"       // Defines UINT8/UINT16 needed by other headers
+#include "type.h"
 #include "ch559.h"
 #include "uart.h"
 #include "ps2.h"
 #include "scancode.h"
 #include "settings.h"
-#include "system.h"     // <--- ADDED: Defines mDelaymS
+#include "system.h"
+#include "usbhost.h"
+#include "usbdef.h"
+#include "processreport.h"
+#include "preset.h"
+#include "andyalloc.h"
 #include "serial_input.h"
+#include "linkedlist.h"       // Defines LinkedList struct
+#include "parsedescriptor.h"  // Defines ParseReportDescriptor
+#include "data.h"             // Defines StandardKeyboardDescriptor
 
-// Helper to select the correct scancode set (PS/2 uses Set 2, XT uses Set 1)
-__code uint8_t* GetMakeCode(__code uint8_t* set1, __code uint8_t* set2) {
-    if (FlashSettings->KeyboardMode == MODE_PS2) return set2;
-    return set1;
+// Manually declare ParseReport if missing from headers
+bool ParseReport(__xdata INTERFACE *interface, uint32_t len, __xdata uint8_t *report);
+
+// Global "Virtual" Interface to track state
+__xdata INTERFACE SerialIntf;
+__xdata BOOL SerialIntfInitialized = FALSE;
+
+// Buffer to hold incoming serial bytes
+#define HID_REPORT_SIZE 8
+__xdata uint8_t SerialBuf[HID_REPORT_SIZE];
+__xdata uint8_t SerialBufIdx = 0;
+
+// Safety timer to auto-release keys if serial disconnects
+__xdata uint16_t LastSerialActivity = 0; 
+
+// Initialize the Virtual Interface
+void InitSerialHID(void) {
+    if (SerialIntfInitialized) return;
+
+    // Clear memory for the interface
+    memset(&SerialIntf, 0, sizeof(INTERFACE));
+
+    // Force Protocol to Keyboard so ParseReport treats it correctly
+    SerialIntf.InterfaceProtocol = HID_PROTOCOL_KEYBOARD; 
+    
+    // Initialize the list to NULL (Empty List)
+    // FIX: Removed ListCreate() which does not exist
+    SerialIntf.Reports = NULL;
+
+    // Use the descriptor from data.h
+    // This tells the parser: Byte 0=Mods, Byte 2-7=Keys
+    ParseReportDescriptor(StandardKeyboardDescriptor, 63, &SerialIntf);
+
+    SerialIntfInitialized = TRUE;
 }
 
 void HandleSerialKeys(void) {
-    // Check if data is waiting in the UART buffer
-    // SER1_LSR and bLSR_DATA_RDY are defined in ch559.h
-    if (SER1_LSR & bLSR_DATA_RDY) { 
-        char cmd = SER1_RBR; // Read the received byte directly from register
+    // 1. One-time Initialization
+    if (!SerialIntfInitialized) {
+        InitSerialHID();
+        return;
+    }
+
+    // 2. Read Serial Data
+    while (SER1_LSR & bLSR_DATA_RDY) {
+        uint8_t byte = SER1_RBR;
         
-        __code uint8_t *make = 0;
-        __code uint8_t *break_code = 0;
+        SerialBuf[SerialBufIdx++] = byte;
 
-        // Map characters to HIDman scancodes defined in scancode.c
-        switch (cmd) {
-            case 'U': // Up Arrow
-                make = GetMakeCode(KEY_SET1_UP_MAKE, KEY_SET2_UP_MAKE);
-                break_code = GetMakeCode(KEY_SET1_UP_BREAK, KEY_SET2_UP_BREAK);
-                break;
-            case 'D': // Down Arrow
-                make = GetMakeCode(KEY_SET1_DOWN_MAKE, KEY_SET2_DOWN_MAKE);
-                break_code = GetMakeCode(KEY_SET1_DOWN_BREAK, KEY_SET2_DOWN_BREAK);
-                break;
-            case 'L': // Left Arrow
-                make = GetMakeCode(KEY_SET1_LEFT_MAKE, KEY_SET2_LEFT_MAKE);
-                break_code = GetMakeCode(KEY_SET1_LEFT_BREAK, KEY_SET2_LEFT_BREAK);
-                break;
-            case 'R': // Right Arrow
-                make = GetMakeCode(KEY_SET1_RIGHT_MAKE, KEY_SET2_RIGHT_MAKE);
-                break_code = GetMakeCode(KEY_SET1_RIGHT_BREAK, KEY_SET2_RIGHT_BREAK);
-                break;
-            case 'I': // Insert
-                make = GetMakeCode(KEY_SET1_INSERT_MAKE, KEY_SET2_INSERT_MAKE);
-                break_code = GetMakeCode(KEY_SET1_INSERT_BREAK, KEY_SET2_INSERT_BREAK);
-                break;
-            case 'E': // Escape
-                make = GetMakeCode(KEY_SET1_ESCAPE_MAKE, KEY_SET2_ESCAPE_MAKE);
-                break_code = GetMakeCode(KEY_SET1_ESCAPE_BREAK, KEY_SET2_ESCAPE_BREAK);
-                break;
-            case 'N': // Enter (Newline)
-                make = GetMakeCode(KEY_SET1_ENTER_MAKE, KEY_SET2_ENTER_MAKE);
-                break_code = GetMakeCode(KEY_SET1_ENTER_BREAK, KEY_SET2_ENTER_BREAK);
-                break;
-            case '1': // F1
-                make = GetMakeCode(KEY_SET1_F1_MAKE, KEY_SET2_F1_MAKE);
-                break_code = GetMakeCode(KEY_SET1_F1_BREAK, KEY_SET2_F1_BREAK);
-                break;
-        }
+        // Reset safety timer on activity
+        LastSerialActivity = 0; 
 
-        // If we found a valid key match
-        if (make != 0 && break_code != 0) {
-            SendKeyboard(make);       // Press the key
-            mDelaymS(20);             // Hold it briefly (20ms)
-            SendKeyboard(break_code); // Release the key
+        // If we have a full 8-byte report...
+        if (SerialBufIdx >= HID_REPORT_SIZE) {
+            // Process it! 
+            // 64 = length in bits (8 bytes * 8)
+            ParseReport(&SerialIntf, 64, SerialBuf);
+            
+            // Reset buffer for next packet
+            SerialBufIdx = 0;
         }
+    }
+
+    // 3. Safety Watchdog (Stuck Key Prevention)
+    // Simple timer increment (called approx every loop)
+    if (LastSerialActivity < 60000) LastSerialActivity++;
+
+    // If no data for ~500ms (approx tuning) and we aren't at index 0 (mid-packet)
+    if (LastSerialActivity > 20000) { 
+        // Force an empty report (All Keys Up)
+        memset(SerialBuf, 0, HID_REPORT_SIZE);
+        ParseReport(&SerialIntf, 64, SerialBuf);
+        LastSerialActivity = 0; // Don't spam
+        SerialBufIdx = 0;       // Reset sync
     }
 }

@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// --- Add these lines to firmware/inc/scancode.h ---
 
 extern __code uint8_t KEY_SET1_UP_MAKE[];
 extern __code uint8_t KEY_SET1_UP_BREAK[];
@@ -92,5 +91,25 @@ extern __code uint8_t KEY_SET1_F1_MAKE[];
 extern __code uint8_t KEY_SET1_F1_BREAK[];
 extern __code uint8_t KEY_SET2_F1_MAKE[];
 extern __code uint8_t KEY_SET2_F1_BREAK[];
+
+extern __code uint8_t KEY_SET1_F5_MAKE[];
+extern __code uint8_t KEY_SET1_F5_BREAK[];
+extern __code uint8_t KEY_SET2_F5_MAKE[];
+extern __code uint8_t KEY_SET2_F5_BREAK[];
+
+extern __code uint8_t KEY_SET1_F6_MAKE[];
+extern __code uint8_t KEY_SET1_F6_BREAK[];
+extern __code uint8_t KEY_SET2_F6_MAKE[];
+extern __code uint8_t KEY_SET2_F6_BREAK[];
+
+extern __code uint8_t KEY_SET1_F7_MAKE[];
+extern __code uint8_t KEY_SET1_F7_BREAK[];
+extern __code uint8_t KEY_SET2_F7_MAKE[];
+extern __code uint8_t KEY_SET2_F7_BREAK[];
+
+extern __code uint8_t KEY_SET1_DELETE_MAKE[];
+extern __code uint8_t KEY_SET1_DELETE_BREAK[];
+extern __code uint8_t KEY_SET2_DELETE_MAKE[];
+extern __code uint8_t KEY_SET2_DELETE_BREAK[];
 
 #endif //__SCANCODES_H__

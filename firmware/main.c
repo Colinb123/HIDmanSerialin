@@ -5,6 +5,7 @@
 #include "ch559.h"
 #include "usbhost.h"
 #include "uart.h"
+#include "serial_input.h"
 #include "ps2protocol.h"
 #include "ps2.h"
 #include "parsedescriptor.h"
@@ -42,33 +43,6 @@ void EveryMillisecond(void) {
 
 	UsbUpdateCounter++;
 	
-
-	// handle serial mouse
-	#if defined(OPT_SERIAL_MOUSE)
-		static uint8_t RTSHighCounter = 0;
-		static __xdata uint8_t serialMousePrevMode = SERIAL_MOUSE_MODE_OFF;
-
-		// High toggle (> 50ms) of RTS (P0.4) means host is resetting mouse.  Wait until falling edge and send mouse identification.
-
-		if (P0 & 0b00010000) { // RTS is high (mouse is resetting)
-			if (serialMouseMode != SERIAL_MOUSE_MODE_RESET) {
-				serialMousePrevMode = serialMouseMode;
-				serialMouseMode = SERIAL_MOUSE_MODE_RESET;
-			}
-			if (RTSHighCounter < 255) RTSHighCounter++;
-			
-		} else { // RTS is low
-		if (serialMouseMode == SERIAL_MOUSE_MODE_RESET) {
-				if (RTSHighCounter > 50) { // Check if RTS was high long enough to indicate reset...
-					serialMouseMode = SERIAL_MOUSE_MODE_INIT;
-				} else {
-					serialMouseMode = serialMousePrevMode;
-				}
-				RTSHighCounter = 0;
-			}
-		}
-	#endif
-
 	// check the button
 	inputProcess();
 
@@ -236,7 +210,7 @@ int main(void)
 
 	EA = 1;	 // enable all interrupts
 	// set serial port to recieve characters
-	CH559UART1Init(20, 1, 1, 112500, 8);
+	CH559UART1Init(20, 1, 1, 115200, 8);
 
 	memset(SendBuffer, 0, 255);
 	memset(MouseBuffer, 0, MOUSE_BUFFER_SIZE);
