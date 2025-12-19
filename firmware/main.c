@@ -5,7 +5,6 @@
 #include "ch559.h"
 #include "usbhost.h"
 #include "uart.h"
-#include "serial_input.h"
 #include "ps2protocol.h"
 #include "ps2.h"
 #include "parsedescriptor.h"
@@ -18,56 +17,26 @@
 #include "dataflash.h"
 #include "settings.h"
 #include "system.h"
+#include "serial_input.h" // Includes our serial logic
 
 uint8_t UsbUpdateCounter = 0;
 
 void EveryMillisecond(void) {
-
-	// Soft watchdog is to get around the fact that the real watchdog runs too fast
 	SoftWatchdog++;
-	if (SoftWatchdog > 5000) {
-		// if soft watchdog overflows, just go into an infinite loop and we'll trigger the real watchdog
-		DEBUGOUT("Soft overflow\n");
-		while(1);
-	}
-
-	// otherwise, reset the real watchdog
+	if (SoftWatchdog > 5000) { while(1); }
 	WDOG_COUNT = 0x00;
-	// every 4 milliseconds (250hz), check one or the other USB port (so each gets checked at 125hz)
-	if (UsbUpdateCounter == 4)
-		s_CheckUsbPort0 = TRUE;
-	else if (UsbUpdateCounter == 8){
-		s_CheckUsbPort1 = TRUE;
-		UsbUpdateCounter = 0;
-	}
 
+	if (UsbUpdateCounter == 4) s_CheckUsbPort0 = TRUE;
+	else if (UsbUpdateCounter == 8){ s_CheckUsbPort1 = TRUE; UsbUpdateCounter = 0; }
 	UsbUpdateCounter++;
-	
-	// check the button
+
+    // inputProcess is now empty in menu.c, but we keep the call
 	inputProcess();
 
-	// Deal with BAT (which requires a delay)
+	if (KeyBatCounter){ KeyBatCounter--; if (!KeyBatCounter) SimonSaysSendKeyboard(KEY_BATCOMPLETE); }
+	if (MouseBatCounter){ MouseBatCounter--; if (!MouseBatCounter) { SimonSaysSendMouse1(0xAA); SimonSaysSendMouse1(0x00); } }
+	if (MenuRateLimit) { MenuRateLimit--; }
 
-	if (KeyBatCounter){
-		KeyBatCounter--;
-		if (!KeyBatCounter)
-			SimonSaysSendKeyboard(KEY_BATCOMPLETE);
-	}
-
-	if (MouseBatCounter){
-		MouseBatCounter--;
-		if (!MouseBatCounter) {
-			SimonSaysSendMouse1(0xAA); // POST OK
-			SimonSaysSendMouse1(0x00); // Squeek Squeek I'm a mouse
-		}
-	}
-
-	if (MenuRateLimit) {
-		MenuRateLimit--;
-	}
-
-
-	// Turn current LED on if we haven't seen any activity in a while
 	if (LEDDelayMs) {
 		LEDDelayMs--;
 	} else {
@@ -75,113 +44,45 @@ void EveryMillisecond(void) {
 		SetPWM2Dat(0x10);
 #elif defined (BOARD_PS2)
 		P0 |= 0b01110000;
-
 		switch (FlashSettings->KeyboardMode) {
-			case MODE_PS2:
-				// blue
-				P0 &= ~0b01000000;
-			break;
-			case MODE_XT:
-				// orange
-				P0 &= ~0b00010000;
-				P0 &= ~0b00100000;
-			break;
-			case MODE_AMSTRAD:
-				// white
-				P0 &= ~0b00010000;
-				P0 &= ~0b00100000;
-				P0 &= ~0b01000000;
-			break;
+			case MODE_PS2: P0 &= ~0b01000000; break;     // Blue
+			case MODE_XT:  P0 &= ~0b00010000; P0 &= ~0b00100000; break; // Orange
+			case MODE_AMSTRAD: P0 &= ~0b00010000; P0 &= ~0b00100000; P0 &= ~0b01000000; break; // White
 		}
-
 #else
-			SetPWM1Dat(0x00);
-			SetPWM2Dat(0x00);
-			T3_FIFO_L = 0;
-			T3_FIFO_H = 0;
-
+			SetPWM1Dat(0x00); SetPWM2Dat(0x00); T3_FIFO_L = 0; T3_FIFO_H = 0;
 			switch (FlashSettings->KeyboardMode){
-				case MODE_PS2:
-					// blue
-					T3_FIFO_L = 0xFF;
-					T3_FIFO_H = 0;
-				break;
-				case MODE_XT:
-					// orange
-					SetPWM2Dat(0x10);
-					SetPWM1Dat(0x40);
-				break;
-				case MODE_AMSTRAD:
-					// white
-					SetPWM1Dat(0x30);
-					SetPWM2Dat(0x20);
-					T3_FIFO_L = 0x3F;
-					T3_FIFO_H = 0;
-				break;
-
+				case MODE_PS2: T3_FIFO_L = 0xFF; T3_FIFO_H = 0; break;
+				case MODE_XT: SetPWM2Dat(0x10); SetPWM1Dat(0x40); break;
+				case MODE_AMSTRAD: SetPWM1Dat(0x30); SetPWM2Dat(0x20); T3_FIFO_L = 0x3F; T3_FIFO_H = 0; break;
 			}
 #endif
 	}
 }
 
-
-
-// timer should run at 48MHz divided by (0xFFFF - (TH0TL0))
-// i.e. 60khz
 void mTimer0Interrupt(void) __interrupt(INT_NO_TMR0)
 {
-
 	if (OutputsEnabled) {
-
 		switch (FlashSettings->KeyboardMode) {
-			case (MODE_PS2):
-				PS2ProcessPort(PORT_KEY);
-				break;
-
-			case (MODE_XT):
-				XTProcessPort();
-				break;
-
-			case (MODE_AMSTRAD):
-				AmstradProcessPort();
-				break;
+			case (MODE_PS2): PS2ProcessPort(PORT_KEY); break;
+			case (MODE_XT): XTProcessPort(); break;
+			case (MODE_AMSTRAD): AmstradProcessPort(); break;
 		}
-
-		// May as well do this even in XT mode, can't hurt
 		PS2ProcessPort(PORT_MOUSE);
-
-		// Handle keyboard typematic repeat timers
-		// (divide timer down to 15KHz to make maths easier)
 		static uint8_t repeatDiv = 0;
-		if (++repeatDiv == 4) {
-			repeatDiv = 0;
-			RepeatTimer();
-		}
+		if (++repeatDiv == 4) { repeatDiv = 0; RepeatTimer(); }
 	}
-
 	static uint8_t msDiv = 0;
-	if (++msDiv == 60) {
-		msDiv = 0;
-		EveryMillisecond();
-	}
-
+	if (++msDiv == 60) { msDiv = 0; EveryMillisecond(); }
 }
-
 
 int main(void)
 {
 	bool WatchdogReset = 0;
-
-	// Watchdog happened, go to "safe mode"
-	if (!(PCON & bRST_FLAG0) && (PCON & bRST_FLAG1)){
-		WatchdogReset = 1;
-	}
+	if (!(PCON & bRST_FLAG0) && (PCON & bRST_FLAG1)){ WatchdogReset = 1; }
 
 	GPIOInit();
-
-	//delay a bit, without using the builtin functions
-	UsbUpdateCounter = 255;
-	while (--UsbUpdateCounter);
+	UsbUpdateCounter = 255; while (--UsbUpdateCounter);
 
 #if defined(OSC_EXTERNAL)
 	if (!(P3 & (1 << 4))) runBootloader();
@@ -189,68 +90,43 @@ int main(void)
 
 	ClockInit();
     mDelaymS(500);   
-	
 #if !defined(BOARD_MICRO)
 	InitUART0();
 #endif
-
 	InitUsbData();
 	InitUsbHost();
-
 	InitPWM();
-
 	InitPS2Ports();
 
-	// timer0 setup
-	TMOD = (TMOD & 0xf0) | 0x02; // mode 1 (8bit auto reload)
-	TH0 = 0xBD;					 // 60khz
+	TMOD = (TMOD & 0xf0) | 0x02; TH0 = 0xBD;
+	TR0 = 1; ET0 = 1; EA = 1; 
 
-	TR0 = 1; // start timer0
-	ET0 = 1; //enable timer0 interrupt;
-
-	EA = 1;	 // enable all interrupts
-	// set serial port to recieve characters
+    // --- SETUP SERIAL 115200 ---
 	CH559UART1Init(20, 1, 1, 115200, 8);
 
 	memset(SendBuffer, 0, 255);
 	memset(MouseBuffer, 0, MOUSE_BUFFER_SIZE);
 
-	if (WatchdogReset) DEBUGOUT("Watchdog reset detected (%x), entering safemode\n", PCON);
-
 	InitSettings(WatchdogReset);
 
-	// enable watchdog
-	WDOG_COUNT = 0x00;
-	SAFE_MOD = 0x55;
-	SAFE_MOD = 0xAA;
-	GLOBAL_CFG |= bWDOG_EN;
-
-	WDOG_COUNT = 0x00;
-
-	//while(1);
+	WDOG_COUNT = 0x00; SAFE_MOD = 0x55; SAFE_MOD = 0xAA; GLOBAL_CFG |= bWDOG_EN; WDOG_COUNT = 0x00;
 
 	OutputsEnabled = 1;
-
 	DEBUGOUT("ok\n");
 
-	// after 750ms output a BAT OK code on keyboard and mouse
-	// there's a 500ms delay earlier so do 250 now
 	MouseBatCounter = 250;
 	KeyBatCounter = 250;
 
-	// main loop
 	while (1)
 	{
-		// reset watchdog
 		SoftWatchdog = 0;
-		if (MenuActive)
-			Menu_Task();
-		ProcessUsbHostPort();
-		HandleSerialKeys();   // NEW: Handles Serial from Pi
-		HandleMouse(); // used to process the serial commands 
+		if (MenuActive) Menu_Task();
+		ProcessUsbHostPort(); 
+        
+        HandleSerialKeys();   // <--- SERIAL INPUT
+        
+		HandleMouse();       
 		ProcessKeyboardLed();
 		HandleRepeats();
-		//P0 ^= 0b00100000;
-		
 	}
 }
