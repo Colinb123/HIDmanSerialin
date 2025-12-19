@@ -3,7 +3,7 @@
 
 HIDman is an open source device to allow the use of modern USB keyboards and mice on legacy PCs. Its an amazing project and Kudos to all the forks before me. This has been modified for my personal needs but I thought I'd share incase it was useful.
 
-Peripherals that support legacy PCs are becoming hard to find, especially for the very first PCs. This project aims to provide a simple cheap solution that will cover everything from the original IBM 5150 PC all the way up to modern computers that have PS/2 ports.
+Peripherals that support legacy PCs are becoming hard to find, This project aims to provide a simple cheap solution that will cover modern computers that have PS/2 ports.
 
 <img src=/images/hidmanfront.jpg width=50%/>
 <img src=/images/hidmanrear.jpg width=50%/>
