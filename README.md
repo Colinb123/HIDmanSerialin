@@ -1,7 +1,7 @@
 # HIDman
 ## USB HID to XT / AT / PS/2 / Serial converter
 
-HIDman is an open source device to allow the use of modern USB keyboards and mice on legacy PCs.
+HIDman is an open source device to allow the use of modern USB keyboards and mice on legacy PCs. Its an amazing project and Kudos to all the forks before me. This has been modified for my personal needs but I thought I'd share incase it was useful.
 
 Peripherals that support legacy PCs are becoming hard to find, especially for the very first PCs. This project aims to provide a simple cheap solution that will cover everything from the original IBM 5150 PC all the way up to modern computers that have PS/2 ports.
 
@@ -11,22 +11,20 @@ Peripherals that support legacy PCs are becoming hard to find, especially for th
 
 # Features
 
-* (should) Support the majority of standard USB keyboards and mice, including ones that use wireless dongles.
-* Also supports (some) USB Game controllers - buttons/axes are mapped to keypresses or mouse actions
-* Can emulate the following keyboards :
-  * Original IBM PC, XT and clones
-  * AT / PS/2
-  * Amstrad PC (PC1512, PC1640, PC2xxx, PC3xxx, PC4xxx)
-* And the following mice :
-  * Serial Mouse (with optional Logitech-style 3rd button)
-  * PS/2 Mouse (with optional Intellipoint-style scroll wheel and up to 5 buttons)
+ I have disabled the button keyboard select functionality as I only want and need PS/2
+ 
+* There is no mouse support. I have changed the DB9 mouse serial in to work as a "virtual serial USB device". It is expecting USBHID packets to be sent over serial and they will be treated the same as a USBHID keyboard.
+I am using nodered on a Pi to send buffered payloads as per USBHID standard. This enables a device, in my case a CM4 Pi HMI and a programable USBHID keypad, to output keystrokes to a PS/2 enabled device. All the parsing functions are as before, the HIDman just recieves data from a serial input buffer just as it would from USB. If you need the other keyboards and or mouse then use the original files
+
+Build, manufacturing credit and money should go to rasteri. I used PCB way and it was great, tarrifs not so much. If I was making 100 I would update the circuit to have an additonal button to load firmware the first time, tweezers work but you must short the connection the first time.
+
 * Driverless configuration menu - change settings just by opening a text editor
 
 # How to get one
 
 ## Purchase : 
 
-* I have some for sale on my tindie page - https://www.tindie.com/products/rasteri/hidman/
+* He has some for sale on his tindie page - https://www.tindie.com/products/rasteri/hidman/
 * If you're in the US, retro hack shack also has stock - https://retrohackshack.com/product/hidman-usb-keyboard-converter/
 
 ## DIY : 
@@ -55,27 +53,16 @@ Or, you could perhaps connect a wireless keyboard+mouse dongle to one port, and 
 Hub support can be hit-and-miss. This is (mostly) not HIDman's fault - many modern hubs don't support low-speed USB devices properly.
 
 
-## Newer PCs (PS/2) ###
+## Newer PCs (PS/2) ### its all relative
 
-* Connect male-to-male Mini-DIN cables from HIDman’s keyboard and mouse ports to your PC’s PS/2 ports.
+* Connect male-to-male Mini-DIN cables from HIDman’s keyboard to your PC’s PS/2 ports.
 * Turn on your PC.
-* If necessary, press HIDman's ⏻ power button to select PS/2 mode (light blue).
+
 
 <img src=/images/newerpcs.svg width=400/>
 
 
-## Older PCs (AT/XT and Serial)
-
-* Connect a male-to-male Mini-DIN Cable from HIDman's keyboard port into a Mini-DIN to DIN adapter.
-* Connect that adapter to your PC's keyboard port.
-* Connect a straight-through male-to-female DE-9 cable from HIDman's serial port to your PC's serial port.
-* Turn on your PC.
-* Press HIDman's ⏻ power button to select AT mode (light blue), or XT mode (orange) for early 80's IBM PCs and clones.
-
-<img src=/images/olderpcs.svg width=500/>
-
-
-# Configuration
+# Configuration is still there but I have not updated or checked it.
 
 Configuration is provided through a built-in menu system. No software install is required - all interaction is through the keyboard.
 
@@ -98,7 +85,6 @@ If you are having trouble getting a USB device to work, enable HID Dumping then 
 
 # Firmware Update
 
-Firmware development is continuing, so if you have problems it's always worth updating to the latest version.
 
 If you're on windows, first install WCH's ISP tool - https://www.wch.cn/downloads/WCHISPTool_Setup_exe.html
 If on Mac or Linux, install ch55xtool : https://github.com/MarsTechHAN/ch552tool
@@ -106,8 +92,10 @@ If on Mac or Linux, install ch55xtool : https://github.com/MarsTechHAN/ch552tool
 The next step is to put the HIDman in firmware update mode.
 
 1. Disconnect everything from HIDman, including all USB devices and PCs. (failure to do this may result in damage to HIDman, your PC, or both).
-2. Hold down HIDman's ⏻ power button.
-3. Use a USB A-to-A cable to connect HIDman's LOWER USB port to a USB port on your modern PC.
+2. For first time installation follow the instructions in the "Debricking" section below. else
+3. Hold down HIDman's ⏻ power button.
+4. Use a USB A-to-A cable to connect HIDman's LOWER USB port to a USB port on your modern PC. Available online or I made one from 2 old cables
+5. I cannot get hex files to work but bin files work just fine. Compiled in codespace.
 
 If HIDman doesn't appear in your computers' device list, follow the instructions in the "Debricking" section below.
 
@@ -116,6 +104,7 @@ After that, update instructions will depend on your operating system.
 ## Windows
 
 Follow the instructions in this diagram :
+Set the Chip first or it will not find the device
 
 <img src=/images/firmware2.svg width=800/>
 
@@ -147,16 +136,6 @@ HIDman actually outputs keyboard *and* mouse signals on **BOTH** PS/2 connectors
 
 Note that there are two different types of Combined PS/2 ports, and HIDman provides for both types. Generally, laptops will need plugged into the Mouse port on HIDman, and Mini PCs want the Keyboard port. If it doesn't work with one port, try the other one.
 
-
-## Splitter
-
-Another way to take advantage of the Combined PS/2 port functionality is to use a widely-available PS/2 splitter :
-
-<img src=/images/splitter.svg width=500/>
-
-This also allows neater cabling, as you could connect both keyboard and mouse ports to the rear, and not have to connect to the front mouse port.
-
-
 ## Technical description
 
 The HIDman is based around the CH559 from WCH, a remarkably flexible chip with **two** USB HOST ports. This makes it ideal for our purposes.
@@ -164,5 +143,3 @@ The HIDman is based around the CH559 from WCH, a remarkably flexible chip with *
 The code is forked from atc1441's excellent repository - https://github.com/atc1441/CH559sdccUSBHost
 
 PCB and enclosure was designed in KiCad - source files are in the hardware directory.
-
-Development is very active but it is usable in its current state.
