@@ -1,3 +1,9 @@
+I'm new at this whole gitub creator stuff. Always been a consumer.
+
+Below is what I am trying to achieve. 
+at the moment I have a working base that I can compile that uploads and works. Cleaning up the linux/windows line breaks was the key. 
+I have had serial working but run out of memory to run the input buffer. 
+
 # HIDman
 ## USB HID to XT / AT / PS/2 / Serial converter
 
