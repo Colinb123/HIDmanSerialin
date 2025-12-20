@@ -9,7 +9,6 @@
 #include "system.h"
 #include "usbhost.h"
 #include "usbdef.h"
-#include "processreport.h"
 #include "preset.h"
 #include "andyalloc.h"
 #include "serial_input.h"

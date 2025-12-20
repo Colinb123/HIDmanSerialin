@@ -37,8 +37,8 @@ $(OBJDIR)/preset.rel \
 $(OBJDIR)/ps2mapping.rel \
 $(OBJDIR)/linkedlist.rel \
 $(OBJDIR)/scancode.rel \
-$(OBJDIR)/xt.rel
-$(OBJDIR)/serial_input.rel
+$(OBJDIR)/xt.rel \
+$(OBJDIR)/serial_input.rel 
 
 ifneq ($(BOARD_TYPE), BOARD_MICRO)
 	COMMON += $(OBJDIR)/uart.rel
@@ -64,7 +64,7 @@ endif
 CFLAGS := -V -mmcs51 --model-large --stack-auto \
 	--xram-size $(XRAM_SIZE) --xram-loc $(XRAM_LOC) \
 	--code-size $(CODE_SIZE) \
-	-I/ -DFREQ_SYS=$(FREQ_SYS) -D$(BOARD_TYPE) -D$(BOARD_OPTIONS) -D$(OSC_TYPE) \
+	-I. -DFREQ_SYS=$(FREQ_SYS) -D$(BOARD_TYPE) -D$(BOARD_OPTIONS) -D$(OSC_TYPE) \
 	$(EXTRA_FLAGS)
 
 LFLAGS := $(CFLAGS)

@@ -2,13 +2,15 @@
 #include <stdbool.h>
 #include "menu.h"
 
-// Globals needed by linker
+// --- DEFINITIONS REQUIRED BY SYSTEM/LINKER ---
+// These must exist even if the menu is disabled
 uint16_t MenuRateLimit = 0;
 __xdata bool MenuActive = 0;
+__xdata bool KeyboardDebugOutput = 0; // Fixes "Undefined Global" linker error
 __xdata char SendBuffer[32]; 
 char *currchar;
 
-// Empty functions
+// --- DUMMY FUNCTIONS ---
 void Menu_Task(void) { }
 void inputProcess(void) { }
 void Sendbuffer_Task(void) { }
