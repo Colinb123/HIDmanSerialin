@@ -18,6 +18,7 @@
 #include "settings.h"
 #include "system.h"
 
+void mTimer0Interrupt(void) __interrupt(INT_NO_TMR0);
 
 uint8_t UsbUpdateCounter = 0;
 

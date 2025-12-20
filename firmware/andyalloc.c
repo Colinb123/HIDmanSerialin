@@ -52,6 +52,8 @@ void printhexval(uint8_t x){
 void printstackpointer(void)
 {
     uint8_t dumdum = 0;
-
-    printhexval(&dumdum);
+    
+    // FIX: Cast the pointer to a generic integer first, then to a byte
+    // This resolves the "incompatible types" error.
+    printhexval((uint8_t)((uint16_t)(void*)&dumdum));
 }
