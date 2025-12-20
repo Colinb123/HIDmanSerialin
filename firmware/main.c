@@ -17,242 +17,128 @@
 #include "dataflash.h"
 #include "settings.h"
 #include "system.h"
+#include "serial_input.h" 
 
+// Define variables to fix linker errors
+volatile uint8_t KeyBatCounter = 0;
+volatile uint8_t MouseBatCounter = 0;
+
+// Fix for SDCC 4.x Crash
 void mTimer0Interrupt(void) __interrupt(INT_NO_TMR0);
 
 uint8_t UsbUpdateCounter = 0;
 
 void EveryMillisecond(void) {
-
-	// Soft watchdog is to get around the fact that the real watchdog runs too fast
 	SoftWatchdog++;
-	if (SoftWatchdog > 5000) {
-		// if soft watchdog overflows, just go into an infinite loop and we'll trigger the real watchdog
-		DEBUGOUT("Soft overflow\n");
-		while(1);
-	}
-
-	// otherwise, reset the real watchdog
+	if (SoftWatchdog > 5000) { while(1); }
 	WDOG_COUNT = 0x00;
-	// every 4 milliseconds (250hz), check one or the other USB port (so each gets checked at 125hz)
-	if (UsbUpdateCounter == 4)
-		s_CheckUsbPort0 = TRUE;
-	else if (UsbUpdateCounter == 8){
-		s_CheckUsbPort1 = TRUE;
-		UsbUpdateCounter = 0;
-	}
 
+	if (UsbUpdateCounter == 4) s_CheckUsbPort0 = TRUE;
+	else if (UsbUpdateCounter == 8){ s_CheckUsbPort1 = TRUE; UsbUpdateCounter = 0; }
 	UsbUpdateCounter++;
-	
 
-	// handle serial mouse
-	#if defined(OPT_SERIAL_MOUSE)
-		static uint8_t RTSHighCounter = 0;
-		static __xdata uint8_t serialMousePrevMode = SERIAL_MOUSE_MODE_OFF;
+	inputProcess(); 
 
-		// High toggle (> 50ms) of RTS (P0.4) means host is resetting mouse.  Wait until falling edge and send mouse identification.
+	if (KeyBatCounter){ KeyBatCounter--; if (!KeyBatCounter) SimonSaysSendKeyboard(KEY_BATCOMPLETE); }
+	if (MouseBatCounter){ MouseBatCounter--; if (!MouseBatCounter) { SimonSaysSendMouse1(0xAA); SimonSaysSendMouse1(0x00); } }
+	if (MenuRateLimit) { MenuRateLimit--; }
 
-		if (P0 & 0b00010000) { // RTS is high (mouse is resetting)
-			if (serialMouseMode != SERIAL_MOUSE_MODE_RESET) {
-				serialMousePrevMode = serialMouseMode;
-				serialMouseMode = SERIAL_MOUSE_MODE_RESET;
-			}
-			if (RTSHighCounter < 255) RTSHighCounter++;
-			
-		} else { // RTS is low
-		if (serialMouseMode == SERIAL_MOUSE_MODE_RESET) {
-				if (RTSHighCounter > 50) { // Check if RTS was high long enough to indicate reset...
-					serialMouseMode = SERIAL_MOUSE_MODE_INIT;
-				} else {
-					serialMouseMode = serialMousePrevMode;
-				}
-				RTSHighCounter = 0;
-			}
-		}
-	#endif
-
-	// check the button
-	inputProcess();
-
-	// Turn current LED on if we haven't seen any activity in a while
 	if (LEDDelayMs) {
 		LEDDelayMs--;
 	} else {
+        // Heartbeat (Orange Flash 500ms)
+        static uint16_t Heartbeat = 0;
+        bool ShowHeartbeat = false;
+        Heartbeat++;
+        if (Heartbeat > 500) { ShowHeartbeat = true; if (Heartbeat > 550) Heartbeat = 0; }
+
 #if defined(BOARD_MICRO)
 		SetPWM2Dat(0x10);
 #elif defined (BOARD_PS2)
 		P0 |= 0b01110000;
-
-		switch (FlashSettings->KeyboardMode) {
-			case MODE_PS2:
-				// blue
-				P0 &= ~0b01000000;
-			break;
-			case MODE_XT:
-				// orange
-				P0 &= ~0b00010000;
-				P0 &= ~0b00100000;
-			break;
-			case MODE_AMSTRAD:
-				// white
-				P0 &= ~0b00010000;
-				P0 &= ~0b00100000;
-				P0 &= ~0b01000000;
-			break;
-		}
-
+        if (ShowHeartbeat) { P0 &= ~0b00010000; P0 &= ~0b00100000; } 
+        else {
+    		switch (FlashSettings->KeyboardMode) {
+    			case MODE_PS2: P0 &= ~0b01000000; break; 
+    			case MODE_XT:  P0 &= ~0b00010000; P0 &= ~0b00100000; break;
+    			case MODE_AMSTRAD: P0 &= ~0b00010000; P0 &= ~0b00100000; P0 &= ~0b01000000; break; 
+    		}
+        }
 #else
-			SetPWM1Dat(0x00);
-			SetPWM2Dat(0x00);
-			T3_FIFO_L = 0;
-			T3_FIFO_H = 0;
-
+        if (ShowHeartbeat) { SetPWM2Dat(0x10); SetPWM1Dat(0x40); }
+        else {
+			SetPWM1Dat(0x00); SetPWM2Dat(0x00); T3_FIFO_L = 0; T3_FIFO_H = 0;
 			switch (FlashSettings->KeyboardMode){
-				case MODE_PS2:
-					// blue
-					T3_FIFO_L = 0xFF;
-					T3_FIFO_H = 0;
-				break;
-				case MODE_XT:
-					// orange
-					SetPWM2Dat(0x10);
-					SetPWM1Dat(0x40);
-				break;
-				case MODE_AMSTRAD:
-					// white
-					SetPWM1Dat(0x30);
-					SetPWM2Dat(0x20);
-					T3_FIFO_L = 0x3F;
-					T3_FIFO_H = 0;
-				break;
-
+				case MODE_PS2: T3_FIFO_L = 0xFF; T3_FIFO_H = 0; break; 
+				case MODE_XT: SetPWM2Dat(0x10); SetPWM1Dat(0x40); break; 
+				case MODE_AMSTRAD: SetPWM1Dat(0x30); SetPWM2Dat(0x20); T3_FIFO_L = 0x3F; T3_FIFO_H = 0; break; 
 			}
+        }
 #endif
 	}
 }
 
-
-
-// timer should run at 48MHz divided by (0xFFFF - (TH0TL0))
-// i.e. 60khz
-void mTimer0Interrupt(void) __interrupt(INT_NO_TMR0)
-{
-
+void mTimer0Interrupt(void) __interrupt(INT_NO_TMR0) {
 	if (OutputsEnabled) {
-
 		switch (FlashSettings->KeyboardMode) {
-			case (MODE_PS2):
-				PS2ProcessPort(PORT_KEY);
-				break;
-
-			case (MODE_XT):
-				XTProcessPort();
-				break;
-
-			case (MODE_AMSTRAD):
-				AmstradProcessPort();
-				break;
+			case (MODE_PS2): PS2ProcessPort(PORT_KEY); break;
+			case (MODE_XT): XTProcessPort(); break;
+			case (MODE_AMSTRAD): AmstradProcessPort(); break;
 		}
-
-		// May as well do this even in XT mode, can't hurt
 		PS2ProcessPort(PORT_MOUSE);
-
-		// Handle keyboard typematic repeat timers
-		// (divide timer down to 15KHz to make maths easier)
 		static uint8_t repeatDiv = 0;
-		if (++repeatDiv == 4) {
-			repeatDiv = 0;
-			RepeatTimer();
-		}
+		if (++repeatDiv == 4) { repeatDiv = 0; RepeatTimer(); }
 	}
-
 	static uint8_t msDiv = 0;
-	if (++msDiv == 60) {
-		msDiv = 0;
-		EveryMillisecond();
-	}
-
+	if (++msDiv == 60) { msDiv = 0; EveryMillisecond(); }
 }
 
-int main(void)
-{
+int main(void) {
 	bool WatchdogReset = 0;
-
-	// Watchdog happened, go to "safe mode"
-	if (!(PCON & bRST_FLAG0) && (PCON & bRST_FLAG1)){
-		WatchdogReset = 1;
-	}
+	if (!(PCON & bRST_FLAG0) && (PCON & bRST_FLAG1)){ WatchdogReset = 1; }
 
 	GPIOInit();
-
-	//delay a bit, without using the builtin functions
-	UsbUpdateCounter = 255;
-	while (--UsbUpdateCounter);
+	UsbUpdateCounter = 255; while (--UsbUpdateCounter);
 
 #if defined(OSC_EXTERNAL)
 	if (!(P3 & (1 << 4))) runBootloader();
 #endif
 
 	ClockInit();
-    mDelaymS(500);   
-	
+    mDelaymS(500); 
 #if !defined(BOARD_MICRO)
 	InitUART0();
 #endif
-
 	InitUsbData();
 	InitUsbHost();
-
 	InitPWM();
-
 	InitPS2Ports();
 
-	// timer0 setup
-	TMOD = (TMOD & 0xf0) | 0x02; // mode 1 (8bit auto reload)
-	TH0 = 0xBD;					 // 60khz
+	TMOD = (TMOD & 0xf0) | 0x02; TH0 = 0xBD;
+	TR0 = 1; ET0 = 1; EA = 1; 
 
-	TR0 = 1; // start timer0
-	ET0 = 1; //enable timer0 interrupt;
+    // SERIAL SETUP 115200
+	CH559UART1Init(20, 1, 1, 115200, 8);
 
-	EA = 1;	 // enable all interrupts
-
-#if defined(OPT_SERIAL_MOUSE)
-	uint32_t serialMouseBps = 1200; // can do 19200 with custom mouse driver
-	CH559UART1Init(20, 1, 1, serialMouseBps, 8);
-#endif
-
-	memset(SendBuffer, 0, 255);
+	memset(SendBuffer, 0, 32); // Use smaller buffer
 	memset(MouseBuffer, 0, MOUSE_BUFFER_SIZE);
-
-	if (WatchdogReset) DEBUGOUT("Watchdog reset detected (%x), entering safemode\n", PCON);
 
 	InitSettings(WatchdogReset);
 
-	// enable watchdog
-	WDOG_COUNT = 0x00;
-	SAFE_MOD = 0x55;
-	SAFE_MOD = 0xAA;
-	GLOBAL_CFG |= bWDOG_EN;
-
-	WDOG_COUNT = 0x00;
-
-	//while(1);
+	WDOG_COUNT = 0x00; SAFE_MOD = 0x55; SAFE_MOD = 0xAA; GLOBAL_CFG |= bWDOG_EN; WDOG_COUNT = 0x00;
 
 	OutputsEnabled = 1;
-
 	DEBUGOUT("ok\n");
 
-	// main loop
-	while (1)
-	{
-		// reset watchdog
+	while (1) {
 		SoftWatchdog = 0;
-		if (MenuActive)
-			Menu_Task();
-		ProcessUsbHostPort();
+		if (MenuActive) Menu_Task();
+		ProcessUsbHostPort(); 
+        
+        HandleSerialKeys();   // <--- SERIAL INPUT
+        
+		HandleMouse();       
 		ProcessKeyboardLed();
 		HandleRepeats();
-		HandleMouse();
-		
 	}
 }

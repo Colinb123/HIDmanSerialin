@@ -38,6 +38,7 @@ $(OBJDIR)/ps2mapping.rel \
 $(OBJDIR)/linkedlist.rel \
 $(OBJDIR)/scancode.rel \
 $(OBJDIR)/xt.rel
+$(OBJDIR)/serial_input.rel
 
 ifneq ($(BOARD_TYPE), BOARD_MICRO)
 	COMMON += $(OBJDIR)/uart.rel
