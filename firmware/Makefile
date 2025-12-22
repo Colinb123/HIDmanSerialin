@@ -81,9 +81,9 @@ $(OBJDIR)/%.rel : %.c
 $(OBJDIR)/$(TARGET).ihx: makebuilddir $(COMMON) $(OBJDIR)/main.rel
 	$(CC) $(COMMON) $(OBJDIR)/main.rel $(LFLAGS) -o $(OBJDIR)/$(TARGET).ihx
 	
-
+# --- FIXED HEX GENERATION WITH SED ---
 $(OBJDIR)/$(TARGET).hex: $(OBJDIR)/$(TARGET).ihx
-	$(PACK_HEX) $(OBJDIR)/$(TARGET).ihx > $(OBJDIR)/$(TARGET).hex
+	$(PACK_HEX) $(OBJDIR)/$(TARGET).ihx | sed 's/$$/\r/' > $(OBJDIR)/$(TARGET).hex
 
 $(OBJDIR)/$(TARGET).bin: $(OBJDIR)/$(TARGET).ihx
 	$(OBJCOPY) -I ihex -O binary $(OBJDIR)/$(TARGET).ihx $(OBJDIR)/$(TARGET).bin
