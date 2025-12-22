@@ -22,6 +22,10 @@ UINT8X ReceiveDataBuffer[RECEIVE_BUFFER_LEN];
 
 bool DumpReport = 0;
 
+// --- FIX START: Declaration for the reset function ---
+extern void ResetSerialHID(void);
+// --- FIX END ---
+
 void DumpHex(uint8_t *buffa, uint16_t len)
 {
 	static uint16_t cnt;
@@ -35,7 +39,6 @@ void DumpHex(uint8_t *buffa, uint16_t len)
 
 	DEBUGOUT("\n\n");
 }
-
 
 void InitInterface(INTERFACE* Interface)
 {
@@ -992,6 +995,11 @@ void ReenumerateAllPorts(void){
 
 	InitUsbData();
 	andyclearmem();
+    
+    // --- FIX START: Reset Serial HID because heap was cleared ---
+    ResetSerialHID();
+    // --- FIX END ---
+
 	InitPresets();
 	for (i = 0; i < ROOT_HUB_PORT_NUM; i++)
 	{

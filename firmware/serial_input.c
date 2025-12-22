@@ -15,7 +15,6 @@
 #include "linkedlist.h"       
 #include "parsedescriptor.h"  
 #include "data.h"             
-
 bool ParseReport(__xdata INTERFACE *interface, uint32_t len, __xdata uint8_t *report);
 
 __xdata INTERFACE SerialIntf;
@@ -25,8 +24,23 @@ __xdata BOOL SerialIntfInitialized = FALSE;
 __xdata uint8_t SerialBuf[HID_REPORT_SIZE];
 __xdata uint8_t SerialBufIdx = 0;
 
-__xdata uint16_t LastSerialActivity = 0; 
-__xdata BOOL SerialTimedOut = TRUE; 
+// --- NEW HELPER FUNCTIONS FOR SENDING DATA BACK ---
+void UART1_Tx(char c) {
+    // Wait for Transmit Buffer to be empty (bLSR_T_FIFO_EMP)
+    while ((SER1_LSR & bLSR_T_FIFO_EMP) == 0);
+    SER1_THR = c;
+}
+
+void UART1_Str(char *s) {
+    while(*s) {
+        UART1_Tx(*s++);
+    }
+}
+
+void ResetSerialHID(void) {
+    SerialIntfInitialized = FALSE;
+    SerialBufIdx = 0;
+}
 
 void InitSerialHID(void) {
     if (SerialIntfInitialized) return;
@@ -45,27 +59,26 @@ void HandleSerialKeys(void) {
         return;
     }
 
+    // Check UART1 Data Ready (DB9 Port)
     while ((SER1_LSR & bLSR_DATA_RDY) && (loopCount < 16)) {
-        uint8_t byte = SER1_RBR;
+        
+        uint8_t byte = SER1_RBR; // Read byte
+        
         SerialBuf[SerialBufIdx++] = byte;
-        LastSerialActivity = 0; 
-        SerialTimedOut = FALSE;
 
+        // If we have a full packet (8 bytes)
         if (SerialBufIdx >= HID_REPORT_SIZE) {
+            
+            // --- FEEDBACK TO USER ---
+            // This proves the packet was received and aligned correctly
+            UART1_Str("KEY RX\r\n");
+
+            // Process the HID data (Convert to PS/2)
             ParseReport(&SerialIntf, 64, SerialBuf);
+            
+            // Reset buffer
             SerialBufIdx = 0;
         }
         loopCount++;
-    }
-
-    if (!SerialTimedOut) {
-        if (LastSerialActivity < 60000) {
-            LastSerialActivity++;
-        } else {
-            SerialTimedOut = TRUE;
-            memset(SerialBuf, 0, HID_REPORT_SIZE);
-            ParseReport(&SerialIntf, 64, SerialBuf);
-            SerialBufIdx = 0;       
-        }
     }
 }

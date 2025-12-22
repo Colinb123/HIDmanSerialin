@@ -8,12 +8,12 @@
 #include "usbhost.h"
 #include "andyalloc.h"
 
-// --- AGGRESSIVE RAM FIX ---
-// Reduced to 0x0C00 (3KB) to guarantee space for Serial/Stack
+// --- MEMORY FIX ---
+// Reduced to 0x0B00 (2816 bytes) to prevent "Insufficient EXTERNAL RAM"
 #ifdef MEMPOOLMAXSIZE
 #undef MEMPOOLMAXSIZE
 #endif
-#define MEMPOOLMAXSIZE 0x0C00 
+#define MEMPOOLMAXSIZE 0x0B00
 
 __xdata uint8_t MemPool[MEMPOOLMAXSIZE];
 __xdata uint8_t *MemPoolPtr = MemPool;
