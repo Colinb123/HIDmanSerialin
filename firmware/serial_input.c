@@ -14,8 +14,12 @@
 #include "serial_input.h"
 #include "linkedlist.h"       
 #include "parsedescriptor.h"  
-#include "data.h"   
-          
+#include "data.h"             
+
+// External reference to the main loop's LED timer
+extern volatile uint8_t LEDDelayMs;
+
+// External reference to the main parser function
 bool ParseReport(__xdata INTERFACE *interface, uint32_t len, __xdata uint8_t *report);
 
 __xdata INTERFACE SerialIntf;
@@ -25,19 +29,6 @@ __xdata BOOL SerialIntfInitialized = FALSE;
 __xdata uint8_t SerialBuf[HID_REPORT_SIZE];
 __xdata uint8_t SerialBufIdx = 0;
 
-// --- NEW HELPER FUNCTIONS FOR SENDING DATA BACK ---
-void UART1_Tx(char c) {
-    // Wait for Transmit Buffer to be empty (bLSR_T_FIFO_EMP)
-    while ((SER1_LSR & bLSR_T_FIFO_EMP) == 0);
-    SER1_THR = c;
-}
-
-void UART1_Str(char *s) {
-    while(*s) {
-        UART1_Tx(*s++);
-    }
-}
-
 void ResetSerialHID(void) {
     SerialIntfInitialized = FALSE;
     SerialBufIdx = 0;
@@ -46,8 +37,13 @@ void ResetSerialHID(void) {
 void InitSerialHID(void) {
     if (SerialIntfInitialized) return;
     memset(&SerialIntf, 0, sizeof(INTERFACE));
+    
+    // Fake a Standard Keyboard Interface
     SerialIntf.InterfaceProtocol = HID_PROTOCOL_KEYBOARD; 
+    SerialIntf.InterfaceClass = USB_DEV_CLASS_HID;
     SerialIntf.Reports = NULL;
+    
+    // Use the standard descriptor so the parser knows what to do with the 8 bytes
     ParseReportDescriptor(StandardKeyboardDescriptor, 63, &SerialIntf);
     SerialIntfInitialized = TRUE;
 }
@@ -60,24 +56,26 @@ void HandleSerialKeys(void) {
         return;
     }
 
-    // Check UART1 Data Ready (DB9 Port)
+    // Check UART1 Data Ready (DB9 RX Pin)
+    // We limit loopCount to prevent getting stuck here if data floods in
     while ((SER1_LSR & bLSR_DATA_RDY) && (loopCount < 16)) {
         
-        uint8_t byte = SER1_RBR; // Read byte
+        uint8_t byte = SER1_RBR; // Read one byte from hardware
         
         SerialBuf[SerialBufIdx++] = byte;
 
         // If we have a full packet (8 bytes)
         if (SerialBufIdx >= HID_REPORT_SIZE) {
             
-            // --- FEEDBACK TO USER ---
-            // This proves the packet was received and aligned correctly
-            UART1_Str("KEY RX\r\n");
+            // 1. FLASH THE LED (Visual Feedback)
+            // This restores the "Blue Flash" behavior you wanted
+            LEDDelayMs = 10; 
 
-            // Process the HID data (Convert to PS/2)
+            // 2. PROCESS THE HID DATA
+            // This treats the 8 bytes exactly like a USB Keyboard Report
             ParseReport(&SerialIntf, 64, SerialBuf);
             
-            // Reset buffer
+            // 3. RESET
             SerialBufIdx = 0;
         }
         loopCount++;
