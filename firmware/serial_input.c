@@ -82,7 +82,8 @@ void HandleSerialKeys(void) {
             // Only parse if we have memory allocated
             if (SerialIntf.Reports != NULL) {
                  // FIX: Changed 64 to HID_REPORT_SIZE to match buffer size
-                 ParseReport(&SerialIntf, HID_REPORT_SIZE, SerialBuf);
+                // multiply to change bitcount 
+                 ParseReport(&SerialIntf, HID_REPORT_SIZE * 8, SerialBuf);
             } else {
                  DEBUGOUT("ERR: No Report Mem\n");
                  SerialIntfInitialized = FALSE; // Try to re-init next time
