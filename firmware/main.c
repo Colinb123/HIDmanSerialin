@@ -128,7 +128,7 @@ int main(void) {
 
 	ClockInit();
     mDelaymS(500); 
-	CH559UART1Init(1, 0, 1, BAUD_RATE, 8);
+	CH559UART1Init(20, 1, 1, BAUD_RATE, 8);
 #if !defined(BOARD_MICRO)
 #endif
 	InitUsbData();

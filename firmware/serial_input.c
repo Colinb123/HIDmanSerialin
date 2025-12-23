@@ -14,12 +14,9 @@
 #include "serial_input.h"
 #include "linkedlist.h"       
 #include "parsedescriptor.h"  
-#include "data.h"             
+#include "data.h"    
+#include "ps2protocol.h"         
 
-extern volatile uint8_t LEDDelayMs;
-
-// External parser reference
-bool ParseReport(__xdata INTERFACE *interface, uint32_t len, __xdata uint8_t *report);
 
 __xdata INTERFACE SerialIntf;
 __xdata BOOL SerialIntfInitialized = FALSE;
@@ -84,7 +81,8 @@ void HandleSerialKeys(void) {
 
             // Only parse if we have memory allocated
             if (SerialIntf.Reports != NULL) {
-                 ParseReport(&SerialIntf, 64, SerialBuf);
+                 // FIX: Changed 64 to HID_REPORT_SIZE to match buffer size
+                 ParseReport(&SerialIntf, HID_REPORT_SIZE, SerialBuf);
             } else {
                  DEBUGOUT("ERR: No Report Mem\n");
                  SerialIntfInitialized = FALSE; // Try to re-init next time

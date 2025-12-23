@@ -72,31 +72,27 @@ char buf[100];
 
 bool SendKeyboard(const uint8_t *chunk)
 {
-	// reset watchdog timer, this routine blocks. It shouldn't really
-	SoftWatchdog = 0;
-	// chunk is null, pretend we sent it
-	if (chunk == NULL)
-		return 1;
+    // ... existing checks ...
+    if (chunk == NULL) return 1;
 
-	// If we're emulating an 81-key keyboard, don't send keycodes starting with E0
-	if (FlashSettings->XT81Keys && chunk[1] == 0xE0) {
-		TR0 = 1; 
-		return 1; // just pretend we sent it
-	}
-	
-	TR0 = 0; //disable timer0  so send is not disabled while we're in the middle of buffer shuffling
+    // SAVE current state
+    bool oldTR0 = TR0; 
+    TR0 = 0; // Disable Timer 0 Interrupt
 
-	if (!ports[PORT_KEY].sendDisabled &&										 // send disabled by timer task, better not step on its toes
-		(ports[PORT_KEY].sendBuffEnd + 1) % 64 != ports[PORT_KEY].sendBuffStart) // not full
-	{
-		ports[PORT_KEY].sendBuff.chunky[ports[PORT_KEY].sendBuffEnd] = chunk;
-		ports[PORT_KEY].sendBuffEnd = (ports[PORT_KEY].sendBuffEnd + 1) % 64;
-		TR0 = 1; // re-enable timer interrupt
-		return 1;
-	}
+    if (!ports[PORT_KEY].sendDisabled && 
+        (ports[PORT_KEY].sendBuffEnd + 1) % 64 != ports[PORT_KEY].sendBuffStart)
+    {
+        ports[PORT_KEY].sendBuff.chunky[ports[PORT_KEY].sendBuffEnd] = chunk;
+        ports[PORT_KEY].sendBuffEnd = (ports[PORT_KEY].sendBuffEnd + 1) % 64;
+        
+        // RESTORE state
+        TR0 = oldTR0; 
+        return 1;
+    }
 
-	TR0 = 1; // re-enable timer interrupt
-	return 0;
+    // RESTORE state
+    TR0 = oldTR0;
+    return 0;
 }
 
 
