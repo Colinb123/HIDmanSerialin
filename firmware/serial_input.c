@@ -16,10 +16,9 @@
 #include "parsedescriptor.h"  
 #include "data.h"             
 
-// External reference to the main loop's LED timer
 extern volatile uint8_t LEDDelayMs;
 
-// External reference to the main parser function
+// External parser reference
 bool ParseReport(__xdata INTERFACE *interface, uint32_t len, __xdata uint8_t *report);
 
 __xdata INTERFACE SerialIntf;
@@ -36,46 +35,61 @@ void ResetSerialHID(void) {
 
 void InitSerialHID(void) {
     if (SerialIntfInitialized) return;
+    
+    DEBUGOUT("Init Serial HID...\n");
     memset(&SerialIntf, 0, sizeof(INTERFACE));
     
-    // Fake a Standard Keyboard Interface
     SerialIntf.InterfaceProtocol = HID_PROTOCOL_KEYBOARD; 
     SerialIntf.InterfaceClass = USB_DEV_CLASS_HID;
     SerialIntf.Reports = NULL;
     
-    // Use the standard descriptor so the parser knows what to do with the 8 bytes
+    // This function tries to MALLOC memory for the report structure.
+    // If RAM is full, Reports will remain NULL.
     ParseReportDescriptor(StandardKeyboardDescriptor, 63, &SerialIntf);
-    SerialIntfInitialized = TRUE;
+    
+    if (SerialIntf.Reports == NULL) {
+        DEBUGOUT("FAIL: Serial malloc failed! Free more RAM.\n");
+    } else {
+        SerialIntfInitialized = TRUE;
+        DEBUGOUT("Serial HID Ready.\n");
+    }
 }
 
 void HandleSerialKeys(void) {
     uint8_t loopCount = 0;
+    uint8_t i;
 
     if (!SerialIntfInitialized) {
         InitSerialHID();
         return;
     }
 
-    // Check UART1 Data Ready (DB9 RX Pin)
-    // We limit loopCount to prevent getting stuck here if data floods in
+    // Process up to 16 bytes per loop
     while ((SER1_LSR & bLSR_DATA_RDY) && (loopCount < 16)) {
         
-        uint8_t byte = SER1_RBR; // Read one byte from hardware
+        uint8_t byte = SER1_RBR; 
         
         SerialBuf[SerialBufIdx++] = byte;
 
-        // If we have a full packet (8 bytes)
         if (SerialBufIdx >= HID_REPORT_SIZE) {
             
-            // 1. FLASH THE LED (Visual Feedback)
-            // This restores the "Blue Flash" behavior you wanted
+            // Debug Echo to verify data arrival
+            DEBUGOUT("S0 L8- ");
+            for (i = 0; i < HID_REPORT_SIZE; i++) {
+                DEBUGOUT("%02X ", SerialBuf[i]);
+            }
+            DEBUGOUT("\n");
+
             LEDDelayMs = 10; 
 
-            // 2. PROCESS THE HID DATA
-            // This treats the 8 bytes exactly like a USB Keyboard Report
-            ParseReport(&SerialIntf, 64, SerialBuf);
+            // Only parse if we have memory allocated
+            if (SerialIntf.Reports != NULL) {
+                 ParseReport(&SerialIntf, 64, SerialBuf);
+            } else {
+                 DEBUGOUT("ERR: No Report Mem\n");
+                 SerialIntfInitialized = FALSE; // Try to re-init next time
+            }
             
-            // 3. RESET
             SerialBufIdx = 0;
         }
         loopCount++;
