@@ -14,7 +14,8 @@
 #include "serial_input.h"
 #include "linkedlist.h"       
 #include "parsedescriptor.h"  
-#include "data.h"             
+#include "data.h"   
+          
 bool ParseReport(__xdata INTERFACE *interface, uint32_t len, __xdata uint8_t *report);
 
 __xdata INTERFACE SerialIntf;

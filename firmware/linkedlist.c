@@ -63,7 +63,7 @@ uint8_t TestInt(LinkedList* list, uint8_t index, int expectedvalue) {
 
 void testlinkedlist() {
 
-    LinkedList* list;
+    LinkedList* list = NULL;
 
     list = AddInt(list, 1, 69);
     list = AddInt(list, 2, 70);

@@ -16,15 +16,14 @@
 #include "ps2protocol.h"
 #include "usbll.h"
 #include "preset.h"
+#include "serial_input.h"
 
 #define RECEIVE_BUFFER_LEN 512
 UINT8X ReceiveDataBuffer[RECEIVE_BUFFER_LEN];
 
 bool DumpReport = 0;
 
-// --- FIX START: Declaration for the reset function ---
-extern void ResetSerialHID(void);
-// --- FIX END ---
+
 
 void DumpHex(uint8_t *buffa, uint16_t len)
 {

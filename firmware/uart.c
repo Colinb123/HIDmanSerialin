@@ -42,7 +42,7 @@ void InitUART0(void)
     RCLK = 0;                                                                  //UART0����ʱ��
     TCLK = 0;                                                                  //UART0����ʱ��
     PCON |= SMOD;
-    x = 10 * FREQ_SYS / BUAD_RATE / 16;                                             //���������Ƶ��ע��x��ֵ��Ҫ���                            
+    x = 10 * FREQ_SYS / BAUD_RATE / 16;                                             //���������Ƶ��ע��x��ֵ��Ҫ���                            
     x2 = x % 10;
     x /= 10;
     if ( x2 >= 5 ) x++;                                                       //��������

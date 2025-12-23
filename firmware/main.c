@@ -56,7 +56,9 @@ void EveryMillisecond(void) {
         if (Heartbeat > 1000) { 
             ShowHeartbeat = true; 
             // 100ms blink duration
-            if (Heartbeat > 1100) Heartbeat = 0; 
+            if (Heartbeat > 1100) 
+			Heartbeat = 0; 
+		    DEBUGOUT("U");
         }
 
 #if defined(BOARD_MICRO)
@@ -78,7 +80,6 @@ void EveryMillisecond(void) {
         if (ShowHeartbeat) {
             // FIX: Turn OFF Blue (FIFO) before turning ON Orange (PWM)
             T3_FIFO_L = 0; T3_FIFO_H = 0;
-            
             // Turn ON Orange
             SetPWM2Dat(0x10); SetPWM1Dat(0x40);
         } else {
@@ -100,13 +101,12 @@ void EveryMillisecond(void) {
 
 void mTimer0Interrupt(void) __interrupt(INT_NO_TMR0) {
 	if (OutputsEnabled) {
-		switch (FlashSettings->KeyboardMode) {
-			case (MODE_PS2): PS2ProcessPort(PORT_KEY); break;
-			case (MODE_XT): XTProcessPort(); break;
-			case (MODE_AMSTRAD): AmstradProcessPort(); break;
-		}
+        // --- FORCE PS/2 OUTPUT ---
+        // This ensures the buffer gets emptied to the PC
+        PS2ProcessPort(PORT_KEY); 
 		PS2ProcessPort(PORT_MOUSE);
-		static uint8_t repeatDiv = 0;
+		
+        static uint8_t repeatDiv = 0;
 		if (++repeatDiv == 4) { repeatDiv = 0; RepeatTimer(); }
 	}
 	static uint8_t msDiv = 0;
@@ -126,8 +126,8 @@ int main(void) {
 
 	ClockInit();
     mDelaymS(500); 
+	CH559UART1Init(1, 0, 1, BAUD_RATE, 8);
 #if !defined(BOARD_MICRO)
-	InitUART0();
 #endif
 	InitUsbData();
 	InitUsbHost();
@@ -137,8 +137,7 @@ int main(void) {
 	TMOD = (TMOD & 0xf0) | 0x02; TH0 = 0xBD;
 	TR0 = 1; ET0 = 1; EA = 1; 
 
-    // SERIAL SETUP 115200
-	CH559UART1Init(20, 1, 1, 115200, 8);
+
 
 	memset(SendBuffer, 0, 32); 
 	memset(MouseBuffer, 0, MOUSE_BUFFER_SIZE);

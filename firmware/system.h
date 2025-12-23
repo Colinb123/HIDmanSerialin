@@ -1,15 +1,12 @@
 #ifndef	__SYSTEM_H__
 #define __SYSTEM_H__
 
-
-//#define	 FREQ_SYS	48000000ul	  //ϵͳ��Ƶ48MHz
-
-#ifndef  BUAD_RATE
-#ifdef DEBUG
-#define  BUAD_RATE  115200ul
-#else
-#define  BUAD_RATE  115200ul
+#ifndef FREQ_SYS
+    #define FREQ_SYS 48000000ul
 #endif
+
+#ifndef BAUD_RATE
+    #define BAUD_RATE 19200ul  
 #endif
 
 void CfgFsys(void);                        //CH559ʱ��ѡ�������

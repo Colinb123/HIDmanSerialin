@@ -128,43 +128,17 @@ int putcharserial(int c)
 }
 
 
-/**
- * stdio printf directed to UART0 and/or keyboard port using putchar and getchar
+/* stdio printf directed to UART1 (DB9) and/or keyboard port
  */
-
 int putchar(int c)
 {
-	#if !defined(BOARD_MICRO)
-	if (FlashSettings->SerialDebugOutput){
-		while (!TI)
-			;
-		TI = 0;
-		SBUF = c & 0xFF;
-	}
-	#endif
+    // --- MODIFIED: Send to UART1 (DB9) ---
+    // Wait for FIFO to be empty
+    while ((SER1_LSR & bLSR_T_FIFO_EMP) == 0); 
+    // Send Byte
+    SER1_THR = c;
 	
-	if (KeyboardDebugOutput)
-	{
-		// capitals, hold shift first
-		if (c >= 0x41 && c <= 0x5A)
-			while (!SendKeyboard(
-				(FlashSettings->KeyboardMode == MODE_PS2) ? KEY_LSHIFT_MAKE : XT_KEY_LSHIFT_MAKE))
-				;
-
-		// press the key
-		PressKey(c);
-
-		// release the key
-		ReleaseKey(c);
-
-		// release shift
-		if (c >= 0x41 && c <= 0x5A)
-		{
-			while (!SendKeyboard(FlashSettings->KeyboardMode == MODE_PS2 ? KEY_LSHIFT_BREAK : XT_KEY_LSHIFT_BREAK))
-				;
-		}
-	}
-	return c;
+    return c;
 }
 
 int getchar(void)

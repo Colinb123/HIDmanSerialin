@@ -156,6 +156,7 @@ static uint8_t *FetchItem(uint8_t *start, uint8_t *end, HID_ITEM *item)
 		start += 4;
 		return start;
 	}
+	return NULL;
 
 }
 
